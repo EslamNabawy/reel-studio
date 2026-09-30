@@ -1,0 +1,34 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyd
+.venv/
+venv/
+.pytest_cache/
+
+# Vector store (regenerate with rag.py)
+chroma_db/
+
+# HuggingFace model cache (re-downloaded on first run)
+hf_models/
+**/hf_models/
+
+# PyInstaller build output
+build/
+dist/
+*.spec.bak
+*.egg-info/
+
+# Media output / input samples
+output/
+**/video/*.mp4
+
+# Personal / large data — do not commit
+cvs merg/
+data/*.pdf
+**/*.pdf
