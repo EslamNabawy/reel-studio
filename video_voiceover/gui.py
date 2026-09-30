@@ -142,6 +142,86 @@ def poster_frame(path, out_png, at=1.0):
         return False
 
 
+def _open_url(url: str):
+    try:
+        import webbrowser
+        webbrowser.open(url)
+    except Exception:
+        pass
+
+
+KEY_NAMES = ("GOOGLE_API_KEY", "GEMINI_API_KEY")
+
+
+def _read_env_file(path: Path) -> dict:
+    out = {}
+    try:
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            out[k.strip()] = v.strip().strip('"').strip("'")
+    except Exception:
+        pass
+    return out
+
+
+def load_api_key() -> tuple[str, str]:
+    """(key, source label) — first hit wins: app .env, then repo .env."""
+    for path in (BASE / ".env", BASE.parent / ".env"):
+        if not path.exists():
+            continue
+        env = _read_env_file(path)
+        for name in KEY_NAMES:
+            if env.get(name):
+                return env[name], f"{path.name} · {name}"
+    return "", "not set"
+
+
+def save_api_key(key: str) -> Path:
+    """Write GOOGLE_API_KEY to the app folder .env, keeping other lines.
+    An empty key removes the entry instead of writing a blank one."""
+    path = BASE / ".env"
+    lines = []
+    replaced = False
+    if path.exists():
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            if line.strip().split("=", 1)[0] in KEY_NAMES:
+                if key and not replaced:
+                    lines.append(f"GOOGLE_API_KEY={key}")
+                    replaced = True
+                continue
+            lines.append(line)
+    if key and not replaced:
+        lines.append(f"GOOGLE_API_KEY={key}")
+    body = "\n".join(lines).strip()
+    if body:
+        path.write_text(body + "\n", encoding="utf-8")
+    elif path.exists():
+        path.unlink()
+    return path
+
+
+def gemini_check(key: str) -> tuple[bool, str]:
+    """Validate a key with one tiny request. Returns (ok, message)."""
+    try:
+        from google import genai
+    except Exception:
+        return False, "google-genai not installed — pip install google-genai"
+    try:
+        client = genai.Client(api_key=key)
+        r = client.models.generate_content(model="gemini-3.5-flash-lite",
+                                           contents="say ok")
+        _ = (r.text or "").strip()
+        return True, "key works"
+    except Exception as e:
+        msg = str(e).replace("\n", " ")
+        if "API key" in msg or "invalid" in msg.lower() or "401" in msg or "403" in msg:
+            return False, "key rejected by Google"
+        return False, msg[:160]
+
+
 # ─────────────────────────────── widgets ───────────────────────────────
 
 class Hover(tk.Frame):
@@ -180,6 +260,9 @@ class Hover(tk.Frame):
     def _click(self, _=None):
         if self._state == "normal" and self._cmd:
             self._cmd()
+
+    def set_text(self, text):
+        self.label.configure(text=text)
 
     def set_state(self, state):
         self._state = state
@@ -444,12 +527,17 @@ class App:
         self.status = tk.StringVar(value="Drop a video or image to begin.")
         self.stage = tk.StringVar(value="Idle")
 
+        self.api_key, self.key_source = load_api_key()
+        self.key_lbl = tk.StringVar(value="")
+
         self._style()
         self._build()
         self._apply_mode()
+        self._refresh_key_state()
         root.bind("<Control-o>", lambda e: self.browse())
         root.bind("<Control-Return>", lambda e: self.start())
         root.bind("<Escape>", lambda e: self.cancel())
+        root.bind("<Control-k>", lambda e: self.open_settings())
         root.after(80, self._poll)
 
     # ---------- style ----------
@@ -490,8 +578,15 @@ class App:
                  font=font(15, "bold", display=True)).pack(side="left")
         tk.Label(hdr, text="AI voice-over studio", bg=C["surface"], fg=C["muted"],
                  font=font(9)).pack(side="left", padx=(10, 0))
+        self.key_badge = tk.Label(hdr, textvariable=self.key_lbl, bg=C["surface"],
+                                  fg=C["muted"], font=("Consolas", 8))
+        self.key_badge.pack(side="right", padx=(0, 10))
+        self.settings_btn = Hover(hdr, "⚙  API key", command=self.open_settings,
+                                  bg=C["surface2"], padx=12, pady=6,
+                                  font_=font(9, "bold"))
+        self.settings_btn.pack(side="right", padx=(0, 10))
         tk.Label(hdr, text="frames → AI captions → narration → voice + subtitles",
-                 bg=C["surface"], fg=C["text2"], font=font(9)).pack(side="right", padx=18)
+                 bg=C["surface"], fg=C["text2"], font=font(9)).pack(side="right", padx=4)
 
         body = tk.Frame(root, bg=C["bg"])
         body.pack(fill="both", expand=True, padx=16, pady=14)
@@ -742,6 +837,30 @@ class App:
         tk.Label(c3.body, text="Draft = fast preview  ·  Good = default  ·  High = CRF 19",
                  bg=C["surface"], fg=C["muted"], font=font(8)).pack(anchor="w", pady=(8, 0))
 
+        # what runs where
+        c4 = Card(col, "Pipeline", "local vs cloud")
+        c4.pack(fill="x", pady=(0, 12))
+        rows = [
+            ("frame extraction + render (ffmpeg)", "local", C["green"]),
+            ("vision captions (BLIP, cached on disk)", "local", C["green"]),
+            ("language detect (Whisper tiny)", "local", C["green"]),
+            ("voice (edge-tts, Microsoft)", "cloud", C["cyan"]),
+        ]
+        for label, where, col in rows:
+            r = tk.Frame(c4.body, bg=C["surface"])
+            r.pack(fill="x", pady=2)
+            tk.Label(r, text=label, bg=C["surface"], fg=C["text2"],
+                     font=font(8), anchor="w").pack(side="left", fill="x", expand=True)
+            tk.Label(r, text=where, bg=C["surface"], fg=col,
+                     font=("Consolas", 8, "bold")).pack(side="right")
+        rk = tk.Frame(c4.body, bg=C["surface"])
+        rk.pack(fill="x", pady=(2, 0))
+        self.pipe_key_row = tk.Label(rk, text="", bg=C["surface"], fg=C["amber"],
+                                     font=("Consolas", 8), anchor="w")
+        self.pipe_key_row.pack(side="left", fill="x", expand=True)
+        tk.Label(rk, text="cloud", bg=C["surface"], fg=C["cyan"],
+                 font=("Consolas", 8, "bold")).pack(side="right")
+
     def _build_footer(self, root):
         bar = tk.Frame(root, bg=C["surface"], height=28)
         bar.pack(fill="x", side="bottom")
@@ -805,6 +924,126 @@ class App:
         for sl in (self.sub_size_sl, self.sub_margin_sl):
             sl.readout.configure(fg=C["accent2"] if on else C["muted"])
             sl.canvas.configure(cursor="hand2" if on else "arrow")
+
+    # ---------- API key ----------
+
+    def _refresh_key_state(self):
+        if self.api_key:
+            tail = self.api_key[-4:]
+            self.key_lbl.set(f"gemini key ···{tail}")
+            self.key_badge.configure(fg=C["green"])
+        else:
+            self.key_lbl.set("no gemini key")
+            self.key_badge.configure(fg=C["amber"])
+        if hasattr(self, "pipe_key_row") and self.pipe_key_row.winfo_exists():
+            if self.api_key:
+                self.pipe_key_row.configure(fg=C["green"], text="script rewrite (Gemini)  ·  cloud  ·  key ready")
+            else:
+                self.pipe_key_row.configure(fg=C["amber"], text="script rewrite (Gemini)  ·  cloud  ·  no key, raw captions used")
+
+    def open_settings(self):
+        win = tk.Toplevel(self.root)
+        win.title("Reel — settings")
+        win.configure(bg=C["bg"])
+        win.transient(self.root)
+        win.resizable(False, False)
+        try:
+            win.iconbitmap(BASE / "icon.ico")
+        except Exception:
+            pass
+
+        wrap = tk.Frame(win, bg=C["surface"], highlightthickness=1,
+                        highlightbackground=C["line"])
+        wrap.pack(fill="both", expand=True, padx=18, pady=18)
+
+        tk.Label(wrap, text="Gemini API key", bg=C["surface"], fg=C["text"],
+                 font=font(12, "bold", display=True)).pack(anchor="w", padx=20, pady=(20, 2))
+        tk.Label(wrap, text="Used only to turn frame captions into a spoken script.\n"
+                            "Everything else (BLIP vision, Whisper) runs locally.",
+                 bg=C["surface"], fg=C["muted"], font=font(9),
+                 justify="left").pack(anchor="w", padx=20)
+
+        entry_row = tk.Frame(wrap, bg=C["surface"])
+        entry_row.pack(fill="x", padx=20, pady=(16, 0))
+        var = tk.StringVar(value=self.api_key)
+        entry = tk.Entry(entry_row, textvariable=var, show="•", bd=0,
+                         bg=C["surface2"], fg=C["text"], insertbackground=C["accent"],
+                         font=("Consolas", 10), relief="flat", highlightthickness=1,
+                         highlightbackground=C["line"])
+        entry.pack(side="left", fill="x", expand=True, ipady=7, ipadx=8)
+        show = {"on": False}
+
+        def toggle():
+            show["on"] = not show["on"]
+            entry.configure(show="" if show["on"] else "•")
+            eye.set_text("Hide" if show["on"] else "Show")
+
+        eye = Hover(entry_row, "Show", command=toggle, bg=C["surface2"],
+                    padx=12, pady=7, font_=font(8))
+        eye.pack(side="left", padx=(8, 0))
+
+        state = tk.StringVar(value=f"source: {self.key_source}")
+        tk.Label(wrap, textvariable=state, bg=C["surface"], fg=C["muted"],
+                 font=("Consolas", 8)).pack(anchor="w", padx=20, pady=(10, 0))
+
+        link = tk.Label(wrap, text="Get a key at aistudio.google.com/apikey",
+                        bg=C["surface"], fg=C["cyan"], font=font(8), cursor="hand2")
+        link.pack(anchor="w", padx=20, pady=(6, 0))
+        link.bind("<Button-1>", lambda e: _open_url("https://aistudio.google.com/apikey"))
+
+        btns = tk.Frame(wrap, bg=C["surface"])
+        btns.pack(fill="x", padx=20, pady=20)
+        result = tk.StringVar(value="")
+
+        def test():
+            key = var.get().strip()
+            if not key:
+                result.set("enter a key first")
+                return
+            result.set("checking…")
+            def work():
+                ok, msg = gemini_check(key)
+                self.root.after(0, lambda: result.set(("✓ " if ok else "✗ ") + msg))
+            threading.Thread(target=work, daemon=True).start()
+
+        def save():
+            key = var.get().strip()
+            if not key:
+                self.api_key = ""
+            else:
+                self.api_key = key
+                try:
+                    path = save_api_key(key)
+                    self.key_source = f"{path.name} · GOOGLE_API_KEY"
+                except Exception as e:
+                    self.key_source = f"this run only ({e})"
+            state.set(f"source: {self.key_source}")
+            self._refresh_key_state()
+            self.status.set("API key saved" if self.api_key else "API key cleared")
+
+        def clear():
+            var.set("")
+            self.api_key = ""
+            self.key_source = "not set"
+            try:
+                save_api_key("")
+            except Exception:
+                pass
+            self._refresh_key_state()
+            result.set("key cleared — raw captions will be spoken")
+
+        tk.Label(btns, textvariable=result, bg=C["surface"], fg=C["text2"],
+                 font=font(8)).pack(side="left", fill="x", expand=True)
+        Hover(btns, "Clear", command=clear, bg=C["surface2"], fg=C["red"],
+              padx=12, pady=7, font_=font(9)).pack(side="right")
+        Hover(btns, "Test", command=test, bg=C["surface2"], padx=12, pady=7,
+              font_=font(9)).pack(side="right", padx=(0, 8))
+        Hover(btns, "Save", command=save, bg=C["accent"], hover=C["accent2"],
+              padx=20, pady=7, font_=font(10, "bold")).pack(side="right")
+
+        win.bind("<Escape>", lambda e: win.destroy())
+        entry.focus_set()
+        self.settings_win = win
 
     # ---------- media selection ----------
 
@@ -1126,7 +1365,16 @@ class App:
 
         env = os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"
+        if self.api_key:
+            env["GOOGLE_API_KEY"] = self.api_key
+            env["GEMINI_API_KEY"] = self.api_key
+        else:
+            env.pop("GOOGLE_API_KEY", None)
+            env.pop("GEMINI_API_KEY", None)
         self._log("$ " + " ".join(Path(c).name if i == 0 else c for i, c in enumerate(cmd)), "cmd")
+        if self.narr_seg.get() == "ai" and not self.api_key:
+            self._log("no Gemini key — will speak raw BLIP captions "
+                      "(add one under ⚙ API key)", "dim")
         self.start_btn.set_state("disabled")
         self.cancel_btn.set_state("normal")
         self.running = True
