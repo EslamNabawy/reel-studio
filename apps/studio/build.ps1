@@ -14,10 +14,20 @@ Copy-Item (Get-Command ffprobe).Source "$dist\_internal\ffprobe.exe" -Force
 Copy-Item "icon.ico" "$dist\icon.ico" -Force
 if (Test-Path "README_src.txt") { Copy-Item "README_src.txt" "$dist\README.txt" -Force }
 
-# never ship a real API key: ship the template only, user pastes it in-app
+# Never ship a real API key: ship the template only, user pastes it in-app.
+# The key itself is stored per-user by keystore.py, not in the bundle at all.
 Remove-Item "$dist\.env" -Force -ErrorAction SilentlyContinue
-if (Test-Path "..\.env.example") {
-    Copy-Item "..\.env.example" "$dist\.env.example" -Force
+# repo root is two levels up from apps\studio
+$envExample = Join-Path $PSScriptRoot "..\..\.env.example"
+if (Test-Path $envExample) {
+    Copy-Item $envExample "$dist\.env.example" -Force
+} else {
+    Write-Warning ".env.example not found at $envExample - bundle will ship without it"
+}
+
+# Fail loudly rather than shipping a bundle that is missing an external.
+foreach ($f in @("ffmpeg.exe", "ffprobe.exe")) {
+    if (-not (Test-Path "$dist\_internal\$f")) { throw "missing $f in bundle" }
 }
 
 New-Item -ItemType Directory -Force -Path "$dist\models\hub" | Out-Null
