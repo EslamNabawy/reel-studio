@@ -1,8 +1,15 @@
 # Reel Studio (`apps/studio`)
 
+[![CI](https://github.com/EslamNabawy/reel-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/EslamNabawy/reel-studio/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/EslamNabawy/reel-studio)](https://github.com/EslamNabawy/reel-studio/releases)
+
 Desktop app that adds AI voice-over and burned subtitles to videos and images.
 Images become a short video: still frame + voice + subtitles, with real framing
 control (aspect, fit, focal point, Ken Burns motion).
+
+No Python? Grab the installer from
+[**Releases**](https://github.com/EslamNabawy/reel-studio/releases) ·
+back to [root README](../../README.md).
 
 ## Run from source
 
