@@ -1,7 +1,7 @@
 name: Release
 
 # Ship the Windows desktop app: PyInstaller bundle + Inno Setup installer,
-# attached to a GitHub Release. Trigger by pushing a tag like v1.0.0,
+# attached to a GitHub Release. Trigger by pushing a tag like v1.1.0,
 # or manually via "Run workflow" (uses install.iss AppVersion as fallback).
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
           if ("${{ github.ref }}".StartsWith("refs/tags/v")) {
             $v = "${{ github.ref_name }}".TrimStart("v")
           } else {
-            $m = Select-String -Path video_voiceover/install.iss -Pattern '#define AppVersion "([^"]+)"'
+            $m = Select-String -Path apps/studio/install.iss -Pattern '#define AppVersion "([^"]+)"'
             $v = $m.Matches[0].Groups[1].Value
           }
           "version=$v" >> $env:GITHUB_OUTPUT
@@ -34,7 +34,7 @@ jobs:
 
       - name: Stamp installer version
         run: |
-          $iss = "video_voiceover/install.iss"
+          $iss = "apps/studio/install.iss"
           $v = "${{ steps.ver.outputs.version }}"
           (Get-Content $iss) -replace '#define AppVersion "[^"]+"', "#define AppVersion `"$v`"" |
             Set-Content $iss
@@ -53,24 +53,24 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install -r video_voiceover/requirements.txt
+          pip install -r apps/studio/requirements.txt
           pip install pyinstaller pytest Pillow python-dotenv
 
       - name: Run test suite
         run: python -m pytest tests/ -q
 
       - name: Build app bundle
-        working-directory: video_voiceover
+        working-directory: apps/studio
         run: powershell -ExecutionPolicy Bypass -File build.ps1
 
       - name: Build installer
-        working-directory: video_voiceover
+        working-directory: apps/studio
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" install.iss
           Get-ChildItem release/
 
       - name: Pack portable zip
-        working-directory: video_voiceover
+        working-directory: apps/studio
         run: |
           Compress-Archive -Path dist/VideoVoiceOver `
             -DestinationPath "release/VideoVoiceOver-${{ steps.ver.outputs.version }}-portable.zip"
@@ -78,7 +78,7 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        working-directory: video_voiceover
+        working-directory: apps/studio
         run: |
           $tag = "v${{ steps.ver.outputs.version }}"
           $files = Get-ChildItem release/*.exe, release/*.zip | ForEach-Object { $_.FullName }

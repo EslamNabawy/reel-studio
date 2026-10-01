@@ -1,4 +1,4 @@
-# Video VoiceOver
+# Reel Studio (`apps/studio`)
 
 Desktop app that adds AI voice-over and burned subtitles to videos and images.
 Images become a short video: still frame + voice + subtitles, with real framing
@@ -6,12 +6,15 @@ control (aspect, fit, focal point, Ken Burns motion).
 
 ## Run from source
 
+From the repo root:
+
 ```bash
-python app.py            # GUI
-python app.py file.mp4   # CLI
+pip install -r apps\studio\requirements.txt
+python apps\studio\app.py            # GUI
+python apps\studio\app.py file.mp4   # CLI
 ```
 
-CLI examples:
+CLI examples (run from `apps\studio\`):
 
 ```bash
 python app.py myvideo.mp4
@@ -37,10 +40,18 @@ Subtitle size and bottom margin are live, speech rate too.
 | `Ctrl+Enter` | Generate |
 | `Esc` | Cancel |
 
+## API key
+
+The app reads `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) from `.env` next to the
+exe, falling back to the repo-root `.env`. Add it via ⚙ API key in the GUI —
+never commit it (the build ships `.env.example` only).
+
 ## Build exe
 
 ```powershell
-.\build.ps1
+cd apps\studio
+.\build.ps1        # → dist\VideoVoiceOver\
+iscc install.iss   # → release\Reel-Setup-<version>.exe
 ```
 
 Output lands in `dist\VideoVoiceOver\`:
@@ -52,4 +63,4 @@ Output lands in `dist\VideoVoiceOver\`:
 
 `edge-tts` (speech) · `faster-whisper` (transcription) · `BLIP` (image captioning) · `ffmpeg` (mux + subtitle burn-in, must be on PATH) · PyInstaller (packaging).
 
-`build/`, `dist/`, `hf_models/`, `output/` are git-ignored.
+`models/`, `build/`, `dist/`, `release/`, `output/`, `work/` are git-ignored.

@@ -29,9 +29,9 @@ jobs:
       - name: Compile check (all entry points)
         run: |
           python -m py_compile \
-            image_to_text/caption.py \
-            video_voiceover/app.py video_voiceover/gui.py \
-            video_voiceover/voiceover.py video_voiceover/models_setup.py
+            apps/caption/caption.py \
+            apps/studio/app.py apps/studio/gui.py \
+            apps/studio/voiceover.py apps/studio/models_setup.py
 
       - name: Run tests
         run: python -m pytest tests/ -q

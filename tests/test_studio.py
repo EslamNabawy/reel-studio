@@ -1,4 +1,4 @@
-"""Pure-logic tests for video_voiceover/voiceover.py.
+"""Pure-logic tests for apps/studio/voiceover.py.
 
 No models, no network, no ffmpeg: only argparse math, SRT formatting,
 subtitle-style strings and filter-chain construction.
@@ -8,7 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "video_voiceover"))
+sys.path.insert(0, str(ROOT / "apps" / "studio"))
 
 import voiceover as v
 
