@@ -27,6 +27,8 @@ script-rewrite step (without it, raw BLIP captions are spoken).
 
 - **Frame engine** — aspect (16:9 / 9:16 / 1:1 / 4:5), fit (Fill / Fit / Blur BG),
   zoom, Ken Burns motion, click-to-set focal point with live preview
+- **Sectioned options** — jump between All / Frame / Voice / Text / Output instead
+  of scrolling one long column
 - **AI narration** — BLIP describes frames, Gemini writes a spoken script
   (or bring your own script / raw captions)
 - **Voices** — Edge-TTS, Arabic (EG/SA) + English (US/GB), speech-rate control
@@ -70,10 +72,11 @@ GEMINI_API_KEY=your-key
 
 ```bash
 pip install pytest Pillow python-dotenv
-python -m pytest tests/ -q
+python -m pytest tests/ -q        # logic
+python tools/gui_smoke.py         # builds the real window, checks layout
 ```
 
-CI runs this plus a compile check on every push/PR.
+CI runs both, plus a compile check on every push/PR.
 
 ## Release
 
