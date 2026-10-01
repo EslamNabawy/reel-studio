@@ -372,7 +372,7 @@ class Card(tk.Frame):
         tick.pack(side="left", padx=(0, 8))
         tick.pack_propagate(False)
         tk.Label(head, text=title, bg=C["surface"], fg=C["text"],
-                 font=font(10, "bold")).pack(side="left")
+                 font=font(11, "bold")).pack(side="left")
         if subtitle:
             tk.Label(head, text=subtitle, bg=C["surface"], fg=C["muted"],
                      font=font(9)).pack(side="right")
@@ -600,9 +600,9 @@ class App:
         tk.Label(hdr, text="◉", bg=C["surface"], fg=C["accent"],
                  font=font(17, "bold", display=True)).pack(side="left", padx=(18, 8))
         tk.Label(hdr, text="Reel", bg=C["surface"], fg=C["text"],
-                 font=font(15, "bold", display=True)).pack(side="left")
+                 font=font(17, "bold", display=True)).pack(side="left")
         tk.Label(hdr, text="AI voice-over studio", bg=C["surface"], fg=C["muted"],
-                 font=font(9)).pack(side="left", padx=(10, 0))
+                 font=font(10)).pack(side="left", padx=(10, 0))
         self.key_badge = tk.Label(hdr, textvariable=self.key_lbl, bg=C["surface"],
                                   fg=C["muted"], font=("Consolas", 8))
         self.key_badge.pack(side="right", padx=(0, 10))
@@ -614,7 +614,7 @@ class App:
                  bg=C["surface"], fg=C["text2"], font=font(9)).pack(side="right", padx=4)
 
         body = tk.Frame(root, bg=C["bg"])
-        body.pack(fill="both", expand=True, padx=16, pady=14)
+        body.pack(fill="both", expand=True, padx=20, pady=16)
 
         left = tk.Frame(body, bg=C["bg"], width=470)
         left.pack(side="left", fill="y")
@@ -641,10 +641,10 @@ class App:
         inner = tk.Frame(self.drop, bg=C["surface"])
         inner.place(relx=0.5, rely=0.5, anchor="center")
         self.drop_lbl = tk.Label(inner, text="Drop video or image", bg=C["surface"],
-                                 fg=C["text"], font=font(10, "bold"))
+                                 fg=C["text"], font=font(11, "bold"))
         self.drop_lbl.pack()
         tk.Label(inner, text="click to browse  ·  mp4 mov avi mkv webm  |  jpg png webp",
-                 bg=C["surface"], fg=C["muted"], font=font(8)).pack()
+                 bg=C["surface"], fg=C["muted"], font=font(9)).pack()
         if DND and self._dnd_ready(self.root):
             try:
                 self.drop.drop_target_register(DND_FILES)
@@ -672,7 +672,7 @@ class App:
         ph.pack(fill="x", padx=14, pady=(12, 0))
         ph.pack_propagate(False)
         tk.Label(ph, text="PREVIEW", bg=C["surface"], fg=C["text2"],
-                 font=font(9, "bold")).pack(side="left")
+                 font=font(10, "bold")).pack(side="left")
         self.preview_meta = tk.Label(ph, text="", bg=C["surface"], fg=C["muted"],
                                      font=("Consolas", 8))
         self.preview_meta.pack(side="right")
@@ -692,7 +692,7 @@ class App:
         act.pack(fill="x", pady=(12, 0))
         self.start_btn = Hover(act, "▶   Generate", command=self.start,
                                bg=C["accent"], hover=C["accent2"],
-                               padx=20, pady=10, font_=font(11, "bold"))
+                               padx=24, pady=11, font_=font(12, "bold"))
         self.start_btn.pack(side="left")
         self.cancel_btn = Hover(act, "■  Cancel", command=self.cancel,
                                 bg=C["surface2"], fg=C["red"],
@@ -706,7 +706,7 @@ class App:
                          highlightbackground=C["line"])
         strip.pack(fill="x", pady=(12, 0))
         self.stage_lbl = tk.Label(strip, textvariable=self.stage, bg=C["surface"],
-                                  fg=C["cyan"], font=font(10, "bold"), anchor="w")
+                                  fg=C["cyan"], font=font(11, "bold"), anchor="w")
         self.stage_lbl.pack(fill="x", padx=14, pady=(12, 0))
         self.dots = tk.Frame(strip, bg=C["surface"])
         self.dots.pack(fill="x", padx=14, pady=(8, 0))
@@ -725,15 +725,15 @@ class App:
         lh = tk.Frame(lf, bg=C["surface"])
         lh.pack(fill="x", padx=14, pady=(10, 4))
         tk.Label(lh, text="ACTIVITY", bg=C["surface"], fg=C["text2"],
-                 font=font(9, "bold")).pack(side="left")
+                 font=font(10, "bold")).pack(side="left")
         Hover(lh, "Clear", command=self._clear_log, padx=10,
               pady=3, font_=font(8)).pack(side="right")
         inner = tk.Frame(lf, bg=C["surface"])
         inner.pack(fill="both", expand=True, padx=14, pady=(0, 12))
         self.log = tk.Text(inner, wrap="word", state="disabled", bd=0, height=7,
                            bg=C["surface"], fg=C["text2"], insertbackground=C["text"],
-                           font=("Consolas", 8), selectbackground=C["accent"],
-                           relief="flat", padx=8, pady=8)
+                           font=("Consolas", 9), selectbackground=C["accent"],
+                           relief="flat", padx=10, pady=8)
         sb = ttk.Scrollbar(inner, command=self.log.yview)
         self.log.configure(yscrollcommand=sb.set)
         sb.pack(side="right", fill="y")
