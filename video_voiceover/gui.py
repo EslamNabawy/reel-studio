@@ -22,6 +22,11 @@ try:
 except Exception:
     DND = False
 
+try:
+    import models_setup
+except Exception:  # keep the app usable even if the module is missing
+    models_setup = None
+
 FROZEN = bool(getattr(sys, "frozen", False))
 BASE = Path(sys.executable).parent if FROZEN else Path(__file__).parent
 SCRIPT = Path(__file__).parent / "voiceover.py"
@@ -534,6 +539,7 @@ class App:
         self._build()
         self._apply_mode()
         self._refresh_key_state()
+        self.root.after(150, self.refresh_models)
         root.bind("<Control-o>", lambda e: self.browse())
         root.bind("<Control-Return>", lambda e: self.start())
         root.bind("<Escape>", lambda e: self.cancel())
@@ -846,12 +852,12 @@ class App:
             ("language detect (Whisper tiny)", "local", C["green"]),
             ("voice (edge-tts, Microsoft)", "cloud", C["cyan"]),
         ]
-        for label, where, col in rows:
+        for label, where, tint in rows:
             r = tk.Frame(c4.body, bg=C["surface"])
             r.pack(fill="x", pady=2)
             tk.Label(r, text=label, bg=C["surface"], fg=C["text2"],
                      font=font(8), anchor="w").pack(side="left", fill="x", expand=True)
-            tk.Label(r, text=where, bg=C["surface"], fg=col,
+            tk.Label(r, text=where, bg=C["surface"], fg=tint,
                      font=("Consolas", 8, "bold")).pack(side="right")
         rk = tk.Frame(c4.body, bg=C["surface"])
         rk.pack(fill="x", pady=(2, 0))
@@ -860,6 +866,34 @@ class App:
         self.pipe_key_row.pack(side="left", fill="x", expand=True)
         tk.Label(rk, text="cloud", bg=C["surface"], fg=C["cyan"],
                  font=("Consolas", 8, "bold")).pack(side="right")
+
+        # models card
+        c5 = Card(col, "AI models", "needed for vision + language detect")
+        c5.pack(fill="x", pady=(0, 12))
+        self.model_rows = []
+        for label in ("Vision captions (BLIP)", "Language detect (Whisper tiny)"):
+            r = tk.Frame(c5.body, bg=C["surface"])
+            r.pack(fill="x", pady=2)
+            dot = tk.Label(r, text="●", bg=C["surface"], fg=C["muted"], font=font(8))
+            dot.pack(side="left")
+            tk.Label(r, text=label, bg=C["surface"], fg=C["text2"],
+                     font=font(8), anchor="w").pack(side="left", padx=6, fill="x", expand=True)
+            val = tk.Label(r, text="checking…", bg=C["surface"], fg=C["muted"],
+                           font=("Consolas", 8))
+            val.pack(side="right")
+            self.model_rows.append((label, dot, val))
+        mbar_wrap = tk.Frame(c5.body, bg=C["surface"])
+        mbar_wrap.pack(fill="x", pady=(10, 0))
+        self.model_bar = ttk.Progressbar(mbar_wrap, style="Reel.Horizontal.TProgressbar",
+                                         mode="determinate", maximum=100)
+        self.model_bar.pack(side="left", fill="x", expand=True)
+        self.install_btn = Hover(mbar_wrap, "Install models", command=self.install_models,
+                                 bg=C["accent"], hover=C["accent2"],
+                                 padx=14, pady=6, font_=font(9, "bold"))
+        self.install_btn.pack(side="right", padx=(10, 0))
+        self.model_note = tk.Label(c5.body, text="", bg=C["surface"], fg=C["muted"],
+                                   font=font(8), justify="left")
+        self.model_note.pack(anchor="w", pady=(8, 0))
 
     def _build_footer(self, root):
         bar = tk.Frame(root, bg=C["surface"], height=28)
@@ -924,6 +958,66 @@ class App:
         for sl in (self.sub_size_sl, self.sub_margin_sl):
             sl.readout.configure(fg=C["accent2"] if on else C["muted"])
             sl.canvas.configure(cursor="hand2" if on else "arrow")
+
+    # ---------- models ----------
+
+    def refresh_models(self):
+        if models_setup is None:
+            self.model_note.configure(text="models_setup.py missing — cannot manage models")
+            for _, dot, val in self.model_rows:
+                dot.configure(fg=C["red"])
+                val.configure(text="unavailable", fg=C["red"])
+            return
+        try:
+            st = {m["label"]: m for m in models_setup.status()}
+        except Exception as e:
+            self.model_note.configure(text=f"status error: {e}")
+            return
+        for label, dot, val in self.model_rows:
+            m = st.get(label)
+            if not m:
+                continue
+            if m["installed"]:
+                dot.configure(fg=C["green"])
+                val.configure(text=f"installed · {m['size_mb']:.0f} MB", fg=C["green"])
+            else:
+                dot.configure(fg=C["amber"])
+                val.configure(text="not installed", fg=C["amber"])
+        if models_setup.all_installed():
+            self.model_note.configure(text="All models present — vision and language "
+                                           "detection work offline.")
+            self.install_btn.set_state("disabled")
+            self.install_btn.set_text("Models ready")
+        else:
+            self.model_note.configure(text="About 1 GB, downloaded once. Needed for AI "
+                                           "captions and language detection.")
+            self.install_btn.set_state("normal")
+            self.install_btn.set_text("Install models")
+
+    def install_models(self):
+        if models_setup is None or self.running:
+            return
+        self.install_btn.set_state("disabled")
+        self.install_btn.set_text("Downloading…")
+        self.model_bar["value"] = 1
+        self.model_note.configure(text="Contacting Hugging Face…")
+        self._log("installing local AI models (about 1 GB)…", "cmd")
+
+        def progress(done, total):
+            pct = 100.0 if not total else min(100.0, done / total * 100)
+            self.model_bar["value"] = pct
+
+        def log(text):
+            self._log(text, "dim")
+
+        def done(msgs):
+            for m in msgs:
+                self._log(m, "out" if "ready" in m or "installed" in m else "err")
+            self.model_bar["value"] = 100
+            self.refresh_models()
+            self.status.set("Models updated — " + (msgs[-1] if msgs else "done"))
+
+        models_setup.install_async(progress=progress, log=log, done=done)
 
     # ---------- API key ----------
 
@@ -1372,6 +1466,9 @@ class App:
             env.pop("GOOGLE_API_KEY", None)
             env.pop("GEMINI_API_KEY", None)
         self._log("$ " + " ".join(Path(c).name if i == 0 else c for i, c in enumerate(cmd)), "cmd")
+        if models_setup is not None and not models_setup.all_installed():
+            self._log("local AI models are not installed yet — vision captions and "
+                      "language detect will be skipped (Models card → Install)", "dim")
         if self.narr_seg.get() == "ai" and not self.api_key:
             self._log("no Gemini key — will speak raw BLIP captions "
                       "(add one under ⚙ API key)", "dim")
