@@ -366,6 +366,8 @@ class Card(tk.Frame):
     def __init__(self, master, title, subtitle="", pady=14):
         super().__init__(master, bg=C["surface"], highlightthickness=1,
                          highlightbackground=C["line"])
+        edge = tk.Frame(self, bg=C["line2"], height=1)
+        edge.pack(fill="x")
         head = tk.Frame(self, bg=C["surface"])
         head.pack(fill="x", padx=16, pady=(pady, 0))
         tick = tk.Frame(head, bg=C["accent"], width=3, height=15)
@@ -626,6 +628,19 @@ class App:
         self.pane = ScrollPane(right)
         self.pane.pack(fill="both", expand=True)
         col = self.pane.inner
+
+        # section filter rail — collapse the long option column
+        rail = tk.Frame(col, bg=C["bg"])
+        rail.pack(fill="x", pady=(0, 12))
+        SECTIONS = [("all", "All"), ("frame", "Frame"), ("voice", "Voice"),
+                    ("text", "Text"), ("output", "Output")]
+        self.section = "all"
+        self.section_seg = Segmented(rail, SECTIONS, "all", command=self._on_section)
+        self.section_seg.pack(side="left")
+        self.section_hint = tk.Label(rail, text="", bg=C["bg"], fg=C["muted"],
+                                     font=("Consolas", 8))
+        self.section_hint.pack(side="right")
+
         self._build_options(col)
 
         self._build_footer(root)
@@ -677,7 +692,7 @@ class App:
                                      font=("Consolas", 8))
         self.preview_meta.pack(side="right")
 
-        self.preview = tk.Canvas(pc, bg=C["surface"], height=215, highlightthickness=0,
+        self.preview = tk.Canvas(pc, bg=C["surface"], height=248, highlightthickness=0,
                                  cursor="hand2")
         self.preview.pack(fill="x", padx=14, pady=10)
         self.preview.bind("<Configure>", lambda e: self._draw_preview())
@@ -710,10 +725,16 @@ class App:
         self.stage_lbl.pack(fill="x", padx=14, pady=(12, 0))
         self.dots = tk.Frame(strip, bg=C["surface"])
         self.dots.pack(fill="x", padx=14, pady=(8, 0))
-        for name in ["Read", "Frames", "Vision", "Script", "Voice", "Mix", "Render"]:
+        stages = ["Read", "Frames", "Vision", "Script", "Voice", "Mix", "Render"]
+        self._stage_dots = []
+        for i, name in enumerate(stages):
+            if i:
+                tk.Label(self.dots, text="—", bg=C["surface"], fg=C["line"],
+                         font=("Consolas", 8)).pack(side="left", padx=(2, 2))
             d = tk.Label(self.dots, text=name, bg=C["surface"], fg=C["line"],
                          font=("Consolas", 8, "bold"))
             d.pack(side="left")
+            self._stage_dots.append(d)
         self.bar = ttk.Progressbar(strip, style="Reel.Horizontal.TProgressbar",
                                    mode="determinate", maximum=100)
         self.bar.pack(fill="x", padx=14, pady=(10, 14))
@@ -743,9 +764,12 @@ class App:
             self.log.tag_configure(tag, foreground=col)
 
     def _build_options(self, col):
+        # (card, section, kinds) — order here is the display order
+        self._opt_cards = []
+
         # voice card
         c1 = Card(col, "Language & voice")
-        c1.pack(fill="x", pady=(0, 12))
+        self._opt_cards.append((c1, "voice", ("image", "video", "")))
         r1 = tk.Frame(c1.body, bg=C["surface"])
         r1.pack(fill="x")
         self.lang_seg = Segmented(r1, LANGS, "auto", command=self._set_lang)
@@ -765,7 +789,7 @@ class App:
 
         # narration card
         c2 = Card(col, "Narration source")
-        c2.pack(fill="x", pady=(0, 12))
+        self._opt_cards.append((c2, "voice", ("image", "video", "")))
         self.narr_seg = Segmented(c2.body, NARRATION, "ai", command=self._on_narration)
         self.narr_seg.pack(anchor="w")
         self.narr_hint = tk.Label(c2.body, text="BLIP describes frames, Gemini writes the script",
@@ -780,7 +804,7 @@ class App:
 
         # video card (only for video)
         self.card_video = Card(col, "Frame sampling", "videos only")
-        self.card_video.pack(fill="x", pady=(0, 12))
+        self._opt_cards.append((self.card_video, "frame", ("video",)))
         vr = tk.Frame(self.card_video.body, bg=C["surface"])
         vr.pack(fill="x")
         f1 = Field(vr, "Sample every")
@@ -794,7 +818,7 @@ class App:
 
         # image frame card (only for image)
         self.card_frame = Card(col, "Frame", "images only")
-        self.card_frame.pack(fill="x", pady=(0, 12))
+        self._opt_cards.append((self.card_frame, "frame", ("image",)))
 
         self.aspect_seg = Segmented(self.card_frame.body, ASPECTS, "source",
                                     command=lambda v: self._draw_preview())
@@ -835,7 +859,7 @@ class App:
 
         # subtitles
         self.card_sub = Card(col, "Subtitles")
-        self.card_sub.pack(fill="x", pady=(0, 12))
+        self._opt_cards.append((self.card_sub, "text", ("image", "video", "")))
         sr = tk.Frame(self.card_sub.body, bg=C["surface"])
         sr.pack(fill="x")
         self.sub_on = tk.BooleanVar(value=True)
@@ -856,7 +880,7 @@ class App:
 
         # output
         c3 = Card(col, "Output")
-        c3.pack(fill="x", pady=(0, 12))
+        self._opt_cards.append((c3, "output", ("image", "video", "")))
         self.quality_seg = Segmented(c3.body, QUALITY, "good")
         self.quality_seg.pack(anchor="w")
         tk.Label(c3.body, text="Draft = fast preview  ·  Good = default  ·  High = CRF 19",
@@ -864,7 +888,7 @@ class App:
 
         # what runs where
         c4 = Card(col, "Pipeline", "local vs cloud")
-        c4.pack(fill="x", pady=(0, 12))
+        self._opt_cards.append((c4, "output", ("image", "video", "")))
         rows = [
             ("frame extraction + render (ffmpeg)", "local", C["green"]),
             ("vision captions (BLIP, cached on disk)", "local", C["green"]),
@@ -888,7 +912,7 @@ class App:
 
         # models card
         c5 = Card(col, "AI models", "needed for vision + language detect")
-        c5.pack(fill="x", pady=(0, 12))
+        self._opt_cards.append((c5, "output", ("image", "video", "")))
         self.model_rows = []
         for label in ("Vision captions (BLIP)", "Language detect (Whisper tiny)"):
             r = tk.Frame(c5.body, bg=C["surface"])
@@ -924,10 +948,36 @@ class App:
                                      bg=C["surface"], fg=C["muted"], font=font(8))
         self.shortcut_lbl.pack(side="right", padx=16)
 
+    # ---------- section filtering ----------
+
+    def _on_section(self, v):
+        """Show one card group (or all). Cards repack in declared order."""
+        self.section = v
+        shown = 0
+        for card, _sect, _kinds in self._opt_cards:
+            card.pack_forget()          # detach all first: order is then append order
+        for card, sect, kinds in self._opt_cards:
+            if v != "all" and sect != v:
+                continue
+            if self.kind not in kinds:
+                continue
+            card.pack(fill="x", pady=(0, 12))
+            shown += 1
+        label = "all cards" if v == "all" else f"{v} group"
+        if v == "frame" and not self.kind:
+            label = "frame · pick media first"
+        self.section_hint.configure(
+            text=f"{shown} card{'s' if shown != 1 else ''} · {label}")
+        self.status.set(f"Showing {label}")
+
+    def _reflow_cards(self):
+        """Re-pack every option card for the current media mode."""
+        self._on_section(self.section)
+
     # ---------- option callbacks ----------
 
     def _on_fit(self, v):
-        self.hint.configure({
+        self.hint.configure(text={
             "cover": "Click the preview to move the focal point",
             "contain": "Whole image is kept — no focal point needed",
             "blur": "Blurred backdrop fills the frame behind the image",
@@ -1253,17 +1303,12 @@ class App:
 
     def _apply_mode(self):
         if self.kind == "image":
-            self.card_video.pack_forget()
-            self.card_frame.pack(fill="x", pady=(0, 12), before=self.card_sub)
-            self.hint.configure(text="Click the preview to move the focal point")
+            self.hint.configure(text="Click the preview to set the focal point")
         elif self.kind == "video":
-            self.card_frame.pack_forget()
-            self.card_video.pack(fill="x", pady=(0, 12), before=self.card_sub)
             self.hint.configure(text="Video frame — preview shows a poster still")
         else:
-            self.card_video.pack_forget()
-            self.card_frame.pack_forget()
             self.hint.configure(text="Choose a video or image")
+        self._reflow_cards()
         self.manual_box.pack_forget()
         self.preview.delete("all")
         if not HAVE_PIL:

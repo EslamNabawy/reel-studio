@@ -35,3 +35,25 @@ jobs:
 
       - name: Run tests
         run: python -m pytest tests/ -q
+
+  gui-smoke:
+    # Tk needs a real display: xvfb lets us construct the window headlessly
+    # and catch pack/layout regressions that a plain import cannot.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install GUI deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest Pillow python-dotenv
+          sudo apt-get update && sudo apt-get install -y xvfb tk
+
+      - name: Construct GUI headlessly
+        run: xvfb-run -a python tools/gui_smoke.py
