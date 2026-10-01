@@ -20,11 +20,26 @@ else:
     BASE = Path(__file__).resolve().parent
     # share one cache with the GUI model installer and the frozen build
     os.environ.setdefault("HF_HOME", str(BASE / "models"))
-if FROZEN:
-    load_dotenv(BASE / ".env")
-else:
-    load_dotenv(BASE / ".env")
-    load_dotenv(BASE.parent / ".env")
+
+# Key resolution order: process env (the GUI passes it through), then the
+# per-user store, then a legacy .env beside the app. The user store is what
+# keeps the key out of portable bundles.
+try:
+    from keystore import ENV_FILE, candidate_paths, first_key, migrate_legacy_key, read_env_file
+except ImportError:
+    from video_voiceover.keystore import (ENV_FILE, candidate_paths, first_key,
+                                          migrate_legacy_key, read_env_file)
+
+migrate_legacy_key(BASE)
+if not first_key(dict(os.environ)):
+    for _p in candidate_paths(BASE):
+        _key = first_key(read_env_file(_p)) if _p.exists() else ""
+        if _key:
+            os.environ.setdefault("GEMINI_API_KEY", _key)
+            break
+load_dotenv(BASE / ENV_FILE)
+if not FROZEN:
+    load_dotenv(BASE.parent / ENV_FILE)
 
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")

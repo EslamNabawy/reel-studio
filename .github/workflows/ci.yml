@@ -42,6 +42,9 @@ jobs:
       - name: No secrets in history
         run: python tools/audit_history.py
 
+      - name: Key store keeps secrets out of the app folder
+        run: python tools/keystore_check.py
+
   gui-smoke:
     # Tk needs a real display: xvfb lets us construct the window headlessly
     # and catch pack/layout regressions that a plain import cannot.

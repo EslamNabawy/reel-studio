@@ -62,6 +62,9 @@ jobs:
       - name: Docs match the code
         run: python tools/check_docs.py
 
+      - name: Key store check
+        run: python tools/keystore_check.py
+
       - name: Construct GUI headlessly
         run: python tools/gui_smoke.py
 

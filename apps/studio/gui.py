@@ -156,29 +156,26 @@ def _open_url(url: str):
         pass
 
 
-KEY_NAMES = ("GOOGLE_API_KEY", "GEMINI_API_KEY")
+try:
+    from keystore import (ENV_FILE, KEY_NAMES, delete_legacy_key, first_key,
+                          key_store_path, migrate_legacy_key, read_env_file,
+                          set_app_dir)
+except ImportError:  # frozen: module sits next to gui.py
+    from video_voiceover.keystore import (ENV_FILE, KEY_NAMES, delete_legacy_key,
+                                          first_key, key_store_path,
+                                          migrate_legacy_key, read_env_file,
+                                          set_app_dir)
 
-
-def _read_env_file(path: Path) -> dict:
-    out = {}
-    try:
-        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            k, v = line.split("=", 1)
-            out[k.strip()] = v.strip().strip('"').strip("'")
-    except Exception:
-        pass
-    return out
+set_app_dir(BASE)
 
 
 def load_api_key() -> tuple[str, str]:
-    """(key, source label) — first hit wins: app .env, then repo .env."""
-    for path in (BASE / ".env", BASE.parent / ".env"):
+    """(key, source label) — user profile first, then any legacy .env."""
+    migrate_legacy_key(BASE)
+    for path in [key_store_path(), BASE / ENV_FILE, BASE.parent / ENV_FILE]:
         if not path.exists():
             continue
-        env = _read_env_file(path)
+        env = read_env_file(path)
         for name in KEY_NAMES:
             if env.get(name):
                 return env[name], f"{path.name} · {name}"
@@ -186,26 +183,28 @@ def load_api_key() -> tuple[str, str]:
 
 
 def save_api_key(key: str) -> Path:
-    """Write GOOGLE_API_KEY to the app folder .env, keeping other lines.
+    """Write GEMINI_API_KEY to the per-user store, keeping other lines.
     An empty key removes the entry instead of writing a blank one."""
-    path = BASE / ".env"
+    path = key_store_path()
     lines = []
     replaced = False
     if path.exists():
         for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
             if line.strip().split("=", 1)[0] in KEY_NAMES:
                 if key and not replaced:
-                    lines.append(f"GOOGLE_API_KEY={key}")
+                    lines.append(f"GEMINI_API_KEY={key}")
                     replaced = True
                 continue
             lines.append(line)
     if key and not replaced:
-        lines.append(f"GOOGLE_API_KEY={key}")
+        lines.append(f"GEMINI_API_KEY={key}")
     body = "\n".join(lines).strip()
     if body:
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(body + "\n", encoding="utf-8")
     elif path.exists():
         path.unlink()
+    delete_legacy_key(BASE)  # a key must never linger beside the executable
     return path
 
 

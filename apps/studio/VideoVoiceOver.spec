@@ -12,6 +12,7 @@ for pkg in ("transformers", "torch", "av", "ctranslate2", "faster_whisper",
     except Exception:
         pass
 
+hiddenimports += ["keystore", "voiceover", "models_setup"]
 a = Analysis(
     ["app.py"],
     pathex=[],

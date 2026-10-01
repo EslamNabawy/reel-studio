@@ -36,15 +36,22 @@ python -m py_compile apps\studio\app.py apps\studio\gui.py \
 
 python -m pytest tests/ -q
 python tools\gui_smoke.py
+python tools\keystore_check.py
 python tools\check_docs.py
+python tools\audit_history.py
 ```
 
 `gui_smoke.py` builds the real Tk window (parked offscreen) and fails on any Tk
 callback error, any unpainted rounded surface, and any card-ordering mistake. It
 catches the class of bug that a plain import cannot.
 
+`keystore_check.py` proves the key never lands beside the executable, using a
+temporary `APPDATA` so it never touches your real profile.
+
 `check_docs.py` asserts that every flag and shortcut in the docs exists in the
 code, and that every relative link resolves.
+
+`audit_history.py` scans every blob in git history for leaked credentials.
 
 ## Code layout
 
@@ -53,10 +60,11 @@ code, and that every relative link resolves.
 | `apps/studio/app.py` | entry point / router — GUI, CLI, model commands |
 | `apps/studio/gui.py` | all UI: theme, widgets, layout, worker threads |
 | `apps/studio/voiceover.py` | the pipeline; no Tk imports, so it stays testable |
+| `apps/studio/keystore.py` | key storage + legacy migration; no Tk, no deps |
 | `apps/studio/models_setup.py` | local model status / download |
 | `apps/caption/caption.py` | captioning + VQA CLI |
 | `tests/` | engine logic tests |
-| `tools/` | GUI smoke test, CLI-surface dump |
+| `tools/` | GUI smoke test, keystore check, docs check, secret scanner |
 
 Two rules worth keeping:
 
@@ -64,6 +72,12 @@ Two rules worth keeping:
    stays testable and the UI stays responsive.
 2. **Tk is not thread-safe.** Workers put lines on a `queue.Queue`; the main loop
    drains it in `_poll` / `_drain` via `after()`. Never touch a widget off-thread.
+
+And one rule about secrets:
+
+3. **Never write a credential into the app folder.** The key belongs in the
+   per-user store (`keystore.py`). A file written next to the exe ends up in
+   portable bundles and zips.
 
 ## Style
 

@@ -91,9 +91,14 @@ the code.
 
 ## API key
 
-`GEMINI_API_KEY` (or `GOOGLE_API_KEY`) in `.env` beside the exe, falling back to
-the repo-root `.env`. Add it from **⚙ API key** in the GUI — never commit it.
-`build.ps1` deletes any `.env` from the bundle and ships `.env.example` instead.
+`GEMINI_API_KEY` (or `GOOGLE_API_KEY`) is resolved in this order: the process
+environment (the GUI passes it to the CLI), then the per-user store at
+`%APPDATA%\Reel\.env`, then a legacy `.env` beside the app.
+
+Entering the key from **⚙ API key** writes it to the **per-user store**, never
+into the app folder — so a portable copy of Reel can be shared without carrying
+your key. A key left beside the exe by an older build is migrated on first
+launch and the old file removed.
 
 Without a key the app speaks the raw BLIP captions.
 
@@ -118,6 +123,7 @@ GitHub Release.
 | `app.py` | entry point / router: GUI, CLI, model commands |
 | `gui.py` | theme, widgets, layout, worker threads |
 | `voiceover.py` | the pipeline — no Tk imports, so it stays testable |
+| `keystore.py` | key storage in the user profile + legacy migration |
 | `models_setup.py` | local model status and download |
 | `build.ps1` · `install.iss` · `VideoVoiceOver.spec` | packaging |
 

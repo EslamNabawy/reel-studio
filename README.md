@@ -141,9 +141,15 @@ python apps\caption\caption.py images\ --ar
 GEMINI_API_KEY=your-key
 ```
 
-`GOOGLE_API_KEY` is also accepted for backwards compatibility. The GUI writes
-the key for you from **⚙ API key** — it is never committed, and the build ships
-`.env.example` only.
+`GOOGLE_API_KEY` is also accepted for backwards compatibility.
+
+Entering the key from **⚙ API key** stores it per-user, under
+`%APPDATA%\Reel\.env` — never inside the app folder. That is deliberate: it means
+a portable copy of Reel can be shared or zipped without carrying your key with
+it. A key written beside the exe by an older build is migrated automatically on
+first launch and the old file is deleted.
+
+The build ships `.env.example` only, never a real key.
 
 ## Project layout
 

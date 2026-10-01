@@ -95,9 +95,22 @@ failing.
 
 ## Secrets
 
-The Gemini key is read from `.env` beside the exe, falling back to the repo-root
-`.env`. `build.ps1` deletes any `.env` from the bundle and copies
-`.env.example` in its place, so a build can never ship a key.
+`apps/studio/keystore.py` owns all key handling, with no Tk and no third-party
+imports so both `gui.py` and `voiceover.py` can use it.
+
+Resolution order:
+
+1. process environment — the GUI passes the key to the CLI worker this way
+2. `%APPDATA%\Reel\.env` — the per-user store, written by **⚙ API key**
+3. a legacy `.env` beside the app, or one in its parent
+
+The store living outside the app directory is the point: a portable bundle of
+Reel can be copied, zipped or shared and it will not carry a key with it. Older
+builds wrote the key next to the exe, so `migrate_legacy_key()` moves it into the
+store and deletes the original on first launch.
+
+`build.ps1` removes any `.env` from the bundle and copies `.env.example` in its
+place, so a build can never ship a key even by accident.
 
 ## Tests
 
@@ -108,6 +121,14 @@ The Gemini key is read from `.env` beside the exe, falling back to the repo-root
   in every media mode, fires every layout callback, asserts shapes painted and
   the argument build, and traps `report_callback_exception` so a broken Tk
   handler fails the run.
+- `tools/keystore_check.py` — asserts the key store lives outside the app folder,
+  that a legacy key beside the exe is migrated and deleted, and that a non-key
+  `.env` is left alone. Runs against a temporary `APPDATA`, so it never touches
+  the real profile.
+- `tools/audit_history.py` — scans every blob in git history for API keys,
+  tokens, private keys, emails and absolute user paths.
+- `tools/check_docs.py` — asserts the documented flags, shortcuts and links match
+  the code.
 
-That split is deliberate: fast pure-logic tests for the engine, one structural
-test for the UI.
+That split is deliberate: fast pure-logic tests for the engine, structural
+checks for the UI, key handling and the docs.
