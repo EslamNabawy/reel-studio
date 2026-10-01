@@ -360,26 +360,97 @@ class Segmented(tk.Frame):
         self.select(value)
 
 
-class Card(tk.Frame):
-    """Titled panel. body is where content goes."""
+class RoundedSurface(tk.Frame):
+    """Frame with real rounded corners drawn on a canvas.
+
+    Children go in ``.inner``. Tk has no native rounded rect, so the shape is
+    painted (4 ovals + 2 rects + 4 arcs) and the content window is raised
+    above it. Height tracks the content, width tracks the parent.
+    """
+
+    def __init__(self, master, radius=12, fill=None, outline=None, bg=None):
+        parent_bg = bg or str(master.cget("bg"))
+        super().__init__(master, bg=parent_bg)
+        self._r = int(radius)
+        self._h = 1
+        self._fill = fill or C["surface"]
+        self._outline = outline if outline is not None else C["line"]
+        self.canvas = tk.Canvas(self, bg=parent_bg, highlightthickness=0, bd=0)
+        self.canvas.pack(fill="both", expand=True)
+        self.inner = tk.Frame(self.canvas, bg=self._fill)
+        self._win = self.canvas.create_window(0, 0, window=self.inner, anchor="nw")
+        self.canvas.bind("<Configure>", lambda _e: self._paint())
+        self.inner.bind("<Configure>", self._on_inner)
+        self.canvas.bind("<Map>", lambda _e: self._paint())
+
+    def _on_inner(self, _e=None):
+        need = self.inner.winfo_reqheight()
+        if need and abs(self._h - need) > 1:
+            self._h = need
+            self.canvas.configure(height=need)
+        self._paint()
+
+    def _paint(self):
+        c = self.canvas
+        w, h = c.winfo_width(), c.winfo_height()
+        if w < 8 or h < 8:
+            return
+        c.delete("shape")
+        r = max(2, min(self._r, w // 2 - 1, h // 2 - 1))
+        d = 2 * r
+        kw = dict(fill=self._fill, outline="")
+        c.create_oval(0, 0, d, d, tags="shape", **kw)
+        c.create_oval(w - d, 0, w, d, tags="shape", **kw)
+        c.create_oval(0, h - d, d, h, tags="shape", **kw)
+        c.create_oval(w - d, h - d, w, h, tags="shape", **kw)
+        c.create_rectangle(r, 0, w - r, h, tags="shape", **kw)
+        c.create_rectangle(0, r, w, h - r, tags="shape", **kw)
+        if self._outline:
+            c.create_arc(0, 0, d, d, start=90, extent=90, style="arc",
+                         outline=self._outline, tags="shape")
+            c.create_arc(w - d, 0, w, d, start=0, extent=90, style="arc",
+                         outline=self._outline, tags="shape")
+            c.create_arc(w - d, h - d, w, h, start=270, extent=90, style="arc",
+                         outline=self._outline, tags="shape")
+            c.create_arc(0, h - d, d, h, start=180, extent=90, style="arc",
+                         outline=self._outline, tags="shape")
+            c.create_line(r, 0, w - r, 0, fill=self._outline, tags="shape")
+            c.create_line(r, h, w - r, h, fill=self._outline, tags="shape")
+            c.create_line(0, r, 0, h - r, fill=self._outline, tags="shape")
+            c.create_line(w, r, w, h - r, fill=self._outline, tags="shape")
+        c.tag_raise(self._win)
+
+
+    def set_outline(self, color):
+        """Repaint with a different border colour (hover / focus states)."""
+        if color != self._outline:
+            self._outline = color
+            self._paint()
+
+    def set_fill(self, color):
+        if color != self._fill:
+            self._fill = color
+            self.inner.configure(bg=color)
+            self._paint()
+
+
+class Card(RoundedSurface):
+    """Titled rounded panel. body is where content goes."""
 
     def __init__(self, master, title, subtitle="", pady=14):
-        super().__init__(master, bg=C["surface"], highlightthickness=1,
-                         highlightbackground=C["line"])
-        edge = tk.Frame(self, bg=C["line2"], height=1)
-        edge.pack(fill="x")
-        head = tk.Frame(self, bg=C["surface"])
-        head.pack(fill="x", padx=16, pady=(pady, 0))
-        tick = tk.Frame(head, bg=C["accent"], width=3, height=15)
-        tick.pack(side="left", padx=(0, 8))
-        tick.pack_propagate(False)
+        super().__init__(master, radius=12, fill=C["surface"], outline=C["line"])
+        head = tk.Frame(self.inner, bg=C["surface"])
+        head.pack(fill="x", padx=18, pady=(pady, 0))
+        dot = tk.Label(head, text="●", bg=C["surface"], fg=C["accent"],
+                       font=("Segoe UI", 7))
+        dot.pack(side="left", padx=(0, 7))
         tk.Label(head, text=title, bg=C["surface"], fg=C["text"],
                  font=font(11, "bold")).pack(side="left")
         if subtitle:
             tk.Label(head, text=subtitle, bg=C["surface"], fg=C["muted"],
                      font=font(9)).pack(side="right")
-        self.body = tk.Frame(self, bg=C["surface"])
-        self.body.pack(fill="x", padx=16, pady=(10, pady))
+        self.body = tk.Frame(self.inner, bg=C["surface"])
+        self.body.pack(fill="x", padx=18, pady=(10, pady))
 
     def hide(self):
         self.pack_forget()
@@ -647,25 +718,31 @@ class App:
 
     def _build_left(self, parent):
         # drop zone
-        self.drop = tk.Frame(parent, bg=C["surface"], height=64,
-                             highlightthickness=1, highlightbackground=C["line"],
-                             cursor="hand2")
-        self.drop.pack(fill="x")
-        self.drop.pack_propagate(False)
+        self.drop = RoundedSurface(parent, radius=14, fill=C["surface"],
+                                   outline=C["line"])
+        self.drop.pack(fill="x", pady=(0, 2))
+        inner = self.drop.inner
+        inner.configure(cursor="hand2")
+        inner.pack(fill="both", expand=True, padx=16, pady=14)
         self.drop.bind("<Button-1>", lambda e: self.browse())
-        inner = tk.Frame(self.drop, bg=C["surface"])
-        inner.place(relx=0.5, rely=0.5, anchor="center")
+        self.drop.canvas.bind("<Button-1>", lambda e: self.browse())
+        self.drop.canvas.configure(cursor="hand2")
+        inner.bind("<Button-1>", lambda e: self.browse())
+        arrow = tk.Label(inner, text="⬇", bg=C["surface"], fg=C["accent"],
+                         font=("Segoe UI", 16, "bold"))
+        arrow.pack()
         self.drop_lbl = tk.Label(inner, text="Drop video or image", bg=C["surface"],
                                  fg=C["text"], font=font(11, "bold"))
-        self.drop_lbl.pack()
+        self.drop_lbl.pack(pady=(2, 0))
         tk.Label(inner, text="click to browse  ·  mp4 mov avi mkv webm  |  jpg png webp",
                  bg=C["surface"], fg=C["muted"], font=font(9)).pack()
         if DND and self._dnd_ready(self.root):
             try:
-                self.drop.drop_target_register(DND_FILES)
-                self.drop.dnd_bind("<<Drop>>", self._on_drop)
-                self.drop.dnd_bind("<<DropEnter>>", lambda e: self._drop_state(True))
-                self.drop.dnd_bind("<<DropLeave>>", lambda e: self._drop_state(False))
+                for w in (self.drop, self.drop.canvas, inner):
+                    w.drop_target_register(DND_FILES)
+                    w.dnd_bind("<<Drop>>", self._on_drop)
+                    w.dnd_bind("<<DropEnter>>", lambda e: self._drop_state(True))
+                    w.dnd_bind("<<DropLeave>>", lambda e: self._drop_state(False))
             except Exception:
                 pass
 
@@ -1218,7 +1295,8 @@ class App:
             return False
 
     def _drop_state(self, on):
-        self.drop.configure(highlightbackground=C["accent"] if on else C["line"])
+        self.drop.set_outline(C["accent"] if on else C["line"])
+        self.drop.set_fill(C["surface2"] if on else C["surface"])
         self.drop_lbl.configure(fg=C["accent"] if on else C["text"])
 
     def _on_drop(self, event):
@@ -1357,12 +1435,18 @@ class App:
         hpx = c.winfo_height() or 360
         if wpx < 60 or hpx < 60:
             return  # not laid out yet
-        if not self.kind or not HAVE_PIL:
-            c.create_text(wpx / 2, hpx / 2, text="no media", fill=C["muted"], font=font(9))
+        if not HAVE_PIL:
+            self._preview_empty(c, wpx, hpx,
+                                "Preview needs Pillow", "pip install Pillow")
+            return
+        if not self.kind:
+            self._preview_empty(c, wpx, hpx, "No media yet",
+                                "drop a video or image above")
             return
         img = self._load_preview_image()
         if img is None:
-            c.create_text(wpx / 2, hpx / 2, text="cannot read file", fill=C["muted"], font=font(9))
+            self._preview_empty(c, wpx, hpx, "Cannot read file",
+                                "try a different image or video")
             return
 
         ow, oh = self._out_size()
@@ -1423,6 +1507,21 @@ class App:
                           outline=C["amber"], width=1)
         c.create_text(x0, y0 - 6, anchor="sw", text=f"{ow}x{oh}",
                       fill=C["muted"], font=("Consolas", 8))
+
+    def _preview_empty(self, c, wpx, hpx, title, sub=""):
+        """Centred icon + copy so an empty preview still looks designed."""
+        cx, cy = wpx / 2, hpx / 2
+        box = 34
+        c.create_rectangle(cx - box, cy - box - 14, cx + box, cy + box - 14,
+                           outline=C["line2"], width=2)
+        c.create_polygon(cx, cy - 2, cx + box - 6, cy + box - 24,
+                         cx - box + 6, cy + box - 24, outline=C["line2"],
+                         fill=C["surface2"])
+        c.create_oval(cx - 7, cy + box - 26, cx + 7, cy + box - 12,
+                      outline=C["line2"], width=2)
+        c.create_text(cx, cy + box + 6, text=title, fill=C["text2"], font=font(10, "bold"))
+        if sub:
+            c.create_text(cx, cy + box + 26, text=sub, fill=C["muted"], font=font(9))
 
     def _blit(self, canvas, img, x, y):
         photo = ImageTk.PhotoImage(img)

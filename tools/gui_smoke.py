@@ -16,7 +16,19 @@ import gui
 
 def main() -> int:
     root = tk.Tk()
-    root.withdraw()
+    # Real geometry, parked offscreen: withdrawn windows report 1x1 widgets, so
+    # layout code bails early and the test would prove nothing.
+    root.geometry("1240x860+-3200+-3200")
+
+    # Tkinter swallows callback exceptions and only prints them. Trap them so a
+    # broken <Configure>/<Map> handler fails the run instead of hiding.
+    errors: list[str] = []
+
+    def trap(exc_type, exc, tb):
+        errors.append(f"{exc_type.__name__}: {exc}")
+
+    root.report_callback_exception = trap
+
     app = gui.App(root)
     root.update_idletasks()
     root.update()
@@ -73,8 +85,29 @@ def main() -> int:
     args = app._build_args()
     assert "--aspect" in args and "--quality" in args, args
 
+    # empty-state + drop-state painting must not throw
+    app.kind = ""
+    app._draw_preview()
+    root.update()
+    app._drop_state(True)
+    app._drop_state(False)
+    root.update()
+
+    # rounded surfaces must actually paint their shape
+    app.kind = "image"
+    app._on_section("all")
+    root.update()
+    for card, _sect, _kinds in app._opt_cards:
+        if card.winfo_manager() == "pack":
+            assert card.canvas.find_withtag("shape"), f"{card} drew no shape"
+            assert card.canvas.cget("height") != "", f"{card} has no height"
+    assert app.drop.canvas.find_withtag("shape"), "drop zone drew no shape"
+
+    root.update()
+    assert not errors, "Tk callback errors:\n  " + "\n  ".join(errors[:8])
+
     root.destroy()
-    print("gui smoke ok — layout, sections, callbacks, arg build")
+    print("gui smoke ok - layout, sections, callbacks, arg build, no Tk errors")
     return 0
 
 
