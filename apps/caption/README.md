@@ -1,12 +1,15 @@
-# Image to Text
+# Caption (`apps/caption`)
 
 BLIP captioning + VQA over a folder of images. Results written to CSV.
 
 ## Usage
 
+From the repo root:
+
 ```bash
-python caption.py images\                  # caption every image
-python caption.py images\ --question "what is on the table?"
+pip install -r apps\caption\requirements.txt
+python apps\caption\caption.py <images>                  # caption every image
+python apps\caption\caption.py <images> --question "what is on the table?"
 ```
 
 Models:

@@ -1,9 +1,9 @@
 ; Reel — AI voice-over studio. Inno Setup script.
-; Build:  iscc install.iss   (run from video_voiceover\ after build.ps1)
+; Build:  iscc install.iss   (run from apps\studio\ after build.ps1)
 ; Requires dist\VideoVoiceOver to exist (run build.ps1 first).
 
 #define AppName "Reel"
-#define AppVersion "1.0.0"
+#define AppVersion "1.1.0"
 #define AppPublisher "Eslam Nabawy"
 #define AppExe "VideoVoiceOver.exe"
 #define CliExe "VideoVoiceOver_CLI.exe"
