@@ -56,25 +56,26 @@ QUALITY = [("draft", "Draft"), ("good", "Good"), ("high", "High")]
 LANGS = [("auto", "Auto"), ("en", "English"), ("ar", "Arabic")]
 NARRATION = [("ai", "AI Captions"), ("raw", "Raw Captions"), ("manual", "My Script")]
 
+# Pro-studio dark theme: near-black canvas, layered slate surfaces, one violet
+# accent (cyan reserved for progress/cloud, green for done, amber for warns).
 C = {
-    "bg": "#0A0C11",
-    "surface": "#11141C",
-    "surface2": "#161A24",
-    "elev": "#1C2130",
-    "line": "#232A3A",
-    "line2": "#2E3648",
-    "text": "#E9EDF7",
-    "text2": "#A8B2C8",
-    "muted": "#6B7794",
+    "bg": "#07080C",
+    "surface": "#0E1118",
+    "surface2": "#141926",
+    "elev": "#1A2030",
+    "line": "#232B3E",
+    "line2": "#303A52",
+    "text": "#EDF0F9",
+    "text2": "#A9B3CA",
+    "muted": "#67718C",
     "accent": "#7C5CFF",
-    "accent2": "#9A7BFF",
-    "accent_dim": "#4B3AA8",
-    "cyan": "#35D6ED",
+    "accent2": "#A385FF",
+    "accent_dim": "#342A6E",
+    "cyan": "#3AD7EE",
     "green": "#3DDC97",
     "red": "#FF6B6B",
     "amber": "#FFB547",
 }
-C["line2"] = "#2E3648"
 
 FONT = "Segoe UI"
 FONT_DISPLAY = "Segoe UI Variable Display"
@@ -244,10 +245,12 @@ class Hover(tk.Frame):
         self.label = tk.Label(self, text=text, bg=self._bg, fg=self._fg,
                               font=font_ or font(10, "bold"), padx=padx, pady=pady)
         self.label.pack()
+        self._pressed = False
         for w in (self, self.label):
             w.bind("<Enter>", self._enter)
             w.bind("<Leave>", self._leave)
-            w.bind("<Button-1>", self._click)
+            w.bind("<ButtonPress-1>", self._press)
+            w.bind("<ButtonRelease-1>", self._release)
         self.set_state(state)
 
     def _set(self, bg, fg):
@@ -255,15 +258,26 @@ class Hover(tk.Frame):
         self.label.configure(bg=bg, fg=fg)
 
     def _enter(self, _=None):
-        if self._state == "normal":
+        if self._state == "normal" and not self._pressed:
             self._set(self._hover, self._fg)
 
     def _leave(self, _=None):
+        self._pressed = False
         if self._state == "normal":
             self._set(self._bg, self._fg)
 
-    def _click(self, _=None):
-        if self._state == "normal" and self._cmd:
+    def _press(self, _=None):
+        if self._state == "normal":
+            self._pressed = True
+            self._set(C["accent"], "#ffffff")
+            self.label.configure(fg="#ffffff")
+
+    def _release(self, _=None):
+        was = self._pressed
+        self._pressed = False
+        if self._state == "normal":
+            self._set(self._hover, self._fg)
+        if was and self._state == "normal" and self._cmd:
             self._cmd()
 
     def set_text(self, text):
@@ -354,6 +368,9 @@ class Card(tk.Frame):
                          highlightbackground=C["line"])
         head = tk.Frame(self, bg=C["surface"])
         head.pack(fill="x", padx=16, pady=(pady, 0))
+        tick = tk.Frame(head, bg=C["accent"], width=3, height=15)
+        tick.pack(side="left", padx=(0, 8))
+        tick.pack_propagate(False)
         tk.Label(head, text=title, bg=C["surface"], fg=C["text"],
                  font=font(10, "bold")).pack(side="left")
         if subtitle:
@@ -578,6 +595,8 @@ class App:
         hdr = tk.Frame(root, bg=C["surface"], height=62)
         hdr.pack(fill="x", side="top")
         hdr.pack_propagate(False)
+        strip = tk.Frame(root, bg=C["accent"], height=2)
+        strip.pack(fill="x", side="top")
         tk.Label(hdr, text="◉", bg=C["surface"], fg=C["accent"],
                  font=font(17, "bold", display=True)).pack(side="left", padx=(18, 8))
         tk.Label(hdr, text="Reel", bg=C["surface"], fg=C["text"],
