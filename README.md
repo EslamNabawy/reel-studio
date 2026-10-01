@@ -1,26 +1,32 @@
-# AI Toolbox
+# Reel Studio
 
-Collection of standalone Python AI utilities. Each subfolder is independent — install its own `requirements.txt` and run it directly. No shared package, no framework.
+Desktop app that adds AI voice-over and burned subtitles to videos and images.
+Images become a short video: still frame + voice + subtitles, with real framing
+control (aspect, fit, focal point, Ken Burns motion).
+
+> The PDF-RAG tool used to live here — it moved to `../ragmodel/`.
 
 ## Projects
 
-| Folder | What it does | Entry point | Deps |
-| --- | --- | --- | --- |
-| `rag.py` | RAG search over a folder of PDFs. Chunks, embeds with `paraphrase-multilingual-MiniLM-L12-v2`, stores in ChromaDB, answers with Gemini. | `rag.py` | `requirements.txt` |
-| `image_to_text/` | Image captioning / VQA with BLIP. Writes results to CSV. | `image_to_text/caption.py` | `image_to_text/requirements.txt` |
-| `video_voiceover/` | Desktop app: add Arabic or English voice-over + burned subtitles to videos or images. GUI + CLI, packaged with PyInstaller. | `video_voiceover/app.py` | `video_voiceover/requirements.txt` |
+| Folder | What it does | Entry point |
+| --- | --- | --- |
+| `video_voiceover/` | Reel studio: BLIP captions → Gemini script → edge-tts voice + burned subs. GUI + CLI, packaged with PyInstaller + Inno Setup. | `video_voiceover/app.py` |
+| `image_to_text/` | BLIP image captioning / VQA. Writes results to CSV. | `image_to_text/caption.py` |
+| `tests/` | `pytest tests/` — voiceover logic tests. | — |
 
-## Setup
+## Quickstart
 
 ```bash
-# global
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-
-# per project
-pip install -r image_to_text\requirements.txt
 pip install -r video_voiceover\requirements.txt
+python video_voiceover\app.py                 # GUI
+python video_voiceover\app.py clip.mp4        # CLI
+```
+
+CLI examples:
+
+```bash
+python video_voiceover\app.py photo.jpg --lang ar
+python video_voiceover\app.py videos_folder\ --interval 1 --voice ar-EG-ShakirNeural
 ```
 
 ## API keys
@@ -33,22 +39,30 @@ GEMINI_API_KEY=your-key
 
 `.env` is never committed. Keep `.env.example` keys documented instead.
 
+## Build exe
+
+```powershell
+cd video_voiceover
+.\build.ps1        # → dist\VideoVoiceOver\
+iscc install.iss   # → release\Reel-Setup-*.exe
+```
+
+Pushing a `v*.*.*` tag builds + attaches both via the Release workflow.
+
 ## Layout
 
 ```
 .env                  # secrets, ignored
 .gitignore
-requirements.txt      # root-level deps (rag.py)
-rag.py
-data/                 # PDFs loaded by rag.py (*.pdf ignored)
-chroma_db/            # ChromaDB persistence (ignored, rebuildable)
+README.md
+.github/workflows/   # ci.yml (tests) · release.yml (exe + installer)
+tests/
 image_to_text/
 video_voiceover/
-cvs merg/             # personal CVs, ignored
+  app.py · gui.py · voiceover.py · models_setup.py
 ```
 
 ## Notes
 
-- `chroma_db/`, `hf_models/`, `build/`, `dist/`, `output/`, `*.pdf` are git-ignored — regenerate or keep local.
-- First run of BLIP / Whisper / sentence-transformers downloads models to `hf_models/` or the HF cache.
-- Build the desktop exe with `video_voiceover\build.ps1`.
+- `models/`, `build/`, `dist/`, `release/`, `output/`, `work/` are git-ignored — regenerate or keep local.
+- First run downloads BLIP / Whisper (Models card → Install, or `app.py --install-models`).

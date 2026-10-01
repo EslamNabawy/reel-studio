@@ -11,9 +11,6 @@ __pycache__/
 venv/
 .pytest_cache/
 
-# Vector store (regenerate with rag.py)
-chroma_db/
-
 # HuggingFace model cache (re-downloaded on first run, or via --install-models)
 hf_models/
 **/hf_models/
@@ -31,7 +28,5 @@ release/
 output/
 **/video/*.mp4
 
-# Personal / large data — do not commit
-cvs merg/
-data/*.pdf
+# Local PDFs — do not commit
 **/*.pdf
