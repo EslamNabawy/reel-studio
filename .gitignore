@@ -14,13 +14,16 @@ venv/
 # Vector store (regenerate with rag.py)
 chroma_db/
 
-# HuggingFace model cache (re-downloaded on first run)
+# HuggingFace model cache (re-downloaded on first run, or via --install-models)
 hf_models/
 **/hf_models/
+models/
+**/models/
 
-# PyInstaller build output
+# PyInstaller / Inno Setup output
 build/
 dist/
+release/
 *.spec.bak
 *.egg-info/
 

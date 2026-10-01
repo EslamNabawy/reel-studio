@@ -18,11 +18,16 @@ if FROZEN:
     os.environ.setdefault("HF_HOME", str(BASE / "models"))
 else:
     BASE = Path(__file__).resolve().parent
+    # share one cache with the GUI model installer and the frozen build
+    os.environ.setdefault("HF_HOME", str(BASE / "models"))
 if FROZEN:
     load_dotenv(BASE / ".env")
 else:
     load_dotenv(BASE / ".env")
     load_dotenv(BASE.parent / ".env")
+
+os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
 for _stream in (sys.stdout, sys.stderr, sys.stdin):
     try:

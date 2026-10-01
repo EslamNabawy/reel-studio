@@ -21,10 +21,8 @@ if (Test-Path "..\.env.example") {
 }
 
 New-Item -ItemType Directory -Force -Path "$dist\models\hub" | Out-Null
-foreach ($m in @("models--Salesforce--blip-image-captioning-base",
-                 "models--Systran--faster-whisper-tiny")) {
-    if (Test-Path "hf_models\hub\$m") {
-        Copy-Item "hf_models\hub\$m" "$dist\models\hub\" -Recurse -Force
-    }
-}
+# NOTE: AI model weights are NOT bundled. The app installs them on demand
+# (Models card in the UI, or `VideoVoiceOver_CLI.exe --install-models`).
+# To ship them offline instead, copy hf_models\hub\* into $dist\models\hub\ here.
+
 Write-Host "Build done: $dist"
