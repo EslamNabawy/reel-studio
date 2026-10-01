@@ -39,6 +39,9 @@ jobs:
       - name: Docs match the code
         run: python tools/check_docs.py
 
+      - name: No secrets in history
+        run: python tools/audit_history.py
+
   gui-smoke:
     # Tk needs a real display: xvfb lets us construct the window headlessly
     # and catch pack/layout regressions that a plain import cannot.
