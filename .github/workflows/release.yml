@@ -59,6 +59,9 @@ jobs:
       - name: Run test suite
         run: python -m pytest tests/ -q
 
+      - name: Docs match the code
+        run: python tools/check_docs.py
+
       - name: Construct GUI headlessly
         run: python tools/gui_smoke.py
 

@@ -1,73 +1,129 @@
-# Reel Studio (`apps/studio`)
+<div align="center">
+
+# Reel Studio — desktop app
+
+**AI voice-over and burned-in subtitles for videos and images. Arabic and English.**
 
 [![CI](https://github.com/EslamNabawy/reel-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/EslamNabawy/reel-studio/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/EslamNabawy/reel-studio)](https://github.com/EslamNabawy/reel-studio/releases)
+[![Release](https://img.shields.io/github/v/release/EslamNabawy/reel-studio?color=7C5CFF)](https://github.com/EslamNabawy/reel-studio/releases)
 
-Desktop app that adds AI voice-over and burned subtitles to videos and images.
-Images become a short video: still frame + voice + subtitles, with real framing
-control (aspect, fit, focal point, Ken Burns motion).
+[⬇ Download](https://github.com/EslamNabawy/reel-studio/releases) · [Root README](../../README.md) · [Architecture](../../docs/architecture.md) · [Troubleshooting](../../docs/troubleshooting.md)
 
-No Python? Grab the installer from
-[**Releases**](https://github.com/EslamNabawy/reel-studio/releases) ·
-back to [root README](../../README.md).
+</div>
 
-## Run from source
+---
+
+Drop in a video or a photo. Reel samples frames, captions them with BLIP, writes
+a spoken script with Gemini, synthesizes a voice with edge-tts, and burns in
+subtitles with ffmpeg. Images get a full frame engine: aspect, fit, zoom, Ken
+Burns motion and a click-to-set focal point with a live crop preview.
+
+## Run
 
 From the repo root:
 
 ```bash
 pip install -r apps\studio\requirements.txt
 python apps\studio\app.py            # GUI
-python apps\studio\app.py file.mp4   # CLI
+python apps\studio\app.py clip.mp4   # CLI
 ```
 
-CLI examples (run from `apps\studio\`):
+Needs **Python 3.11+** and **ffmpeg** on `PATH`.
+
+<details>
+<summary>First run — fetch the local models</summary>
 
 ```bash
-python app.py myvideo.mp4
-python app.py photo.jpg --aspect 9:16 --fit blur --motion zoom-in
-python app.py photo.jpg --caption "My own script. Second sentence."
-python app.py videos_folder\ --interval 1 --voice ar-EG-ShakirNeural
+python apps\studio\app.py --install-models   # ~1 GB, once
+python apps\studio\app.py --models           # status only
 ```
 
-## The app adapts to what you drop in
+Models land in `apps/studio/models/` and are shared by the GUI, the CLI and a
+frozen build. Without them the app still runs and speaks raw captions.
+</details>
 
-Drop an **image** and the Frame card appears: aspect (Source / 16:9 / 9:16 / 1:1 / 4:5 / 4:3),
-height (Auto / 4K / 1080p / 720p / 480p), fit (Fill / Fit / Blur BG), zoom, Ken Burns motion
-(Still / Zoom In / Zoom Out / Pan Left / Pan Right) and minimum clip length.
-The preview renders the actual crop — **click it to set the focal point**.
+## The GUI adapts to the media
 
-Drop a **video** and Frame is replaced by Frame sampling: seconds per frame and a frame cap.
-Narration source switches between AI captions, raw BLIP captions, or your own script.
-Subtitle size and bottom margin are live, speech rate too.
+**Image** → the Frame card appears: aspect, height, fit, zoom, Ken Burns motion
+and minimum clip length. The preview renders the real crop — **click it to move
+the focal point**.
+
+**Video** → Frame is replaced by Frame sampling: seconds per frame and a frame
+cap.
+
+Narration source switches between a Gemini-written script, raw BLIP captions, or
+your own text. Subtitle size, outline, margin and colour are live, and so is
+speech rate.
+
+The options column is split into sections — `All · Frame · Voice · Text ·
+Output` — so you are not scrolling past everything to change one setting.
 
 | Shortcut | Action |
 | --- | --- |
 | `Ctrl+O` | Browse for media |
 | `Ctrl+Enter` | Generate |
 | `Esc` | Cancel |
+| `Ctrl+K` | API key |
+
+## CLI
+
+`app.py <file-or-folder> [flags]`
+
+```bash
+python app.py photo.jpg --aspect 9:16 --fit blur --motion zoom-in
+python app.py clip.mp4 --lang ar --voice ar-EG-ShakirNeural --rate -10%
+python app.py photo.jpg --caption "First line. Second line." --no-subtitles
+python app.py videos\ --interval 1 --quality draft --keep
+```
+
+| Group | Flags |
+| --- | --- |
+| general | `--lang {auto,ar,en}` `--interval` `--max-frames` `--voice` `--rate` `--pitch` `--caption` `--raw-captions` `--no-subtitles` |
+| frame (images) | `--aspect` `--height` `--fit {cover,contain,blur}` `--zoom` `--fx` `--fy` `--motion` `--min-duration` |
+| subtitles | `--sub-font` `--sub-size` `--sub-outline` `--sub-margin-v` `--sub-color` |
+| output | `--quality {draft,good,high}` `--keep` |
+| app | `--install-models` / `-m` · `--models` |
+
+Output: `output\<name>_voiceover_<lang>.mp4`
+
+Run `python ../../tools/dump_cli.py` from the repo root to print this list from
+the code.
 
 ## API key
 
-The app reads `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) from `.env` next to the
-exe, falling back to the repo-root `.env`. Add it via ⚙ API key in the GUI —
-never commit it (the build ships `.env.example` only).
+`GEMINI_API_KEY` (or `GOOGLE_API_KEY`) in `.env` beside the exe, falling back to
+the repo-root `.env`. Add it from **⚙ API key** in the GUI — never commit it.
+`build.ps1` deletes any `.env` from the bundle and ships `.env.example` instead.
 
-## Build exe
+Without a key the app speaks the raw BLIP captions.
+
+## Build
 
 ```powershell
-cd apps\studio
 .\build.ps1        # → dist\VideoVoiceOver\
 iscc install.iss   # → release\Reel-Setup-<version>.exe
 ```
 
-Output lands in `dist\VideoVoiceOver\`:
+Produces `VideoVoiceOver.exe` (GUI, no console) and `VideoVoiceOver_CLI.exe`.
+AI model weights are **not** bundled — the app installs them on demand via the
+Models card or `--install-models`.
 
-- `VideoVoiceOver.exe` — GUI, no console
-- `VideoVoiceOver_CLI.exe` — command line
+Pushing a `v*.*.*` tag does all of this in CI and attaches the results to a
+GitHub Release.
+
+## Layout
+
+| File | Role |
+| --- | --- |
+| `app.py` | entry point / router: GUI, CLI, model commands |
+| `gui.py` | theme, widgets, layout, worker threads |
+| `voiceover.py` | the pipeline — no Tk imports, so it stays testable |
+| `models_setup.py` | local model status and download |
+| `build.ps1` · `install.iss` · `VideoVoiceOver.spec` | packaging |
 
 ## Stack
 
-`edge-tts` (speech) · `faster-whisper` (transcription) · `BLIP` (image captioning) · `ffmpeg` (mux + subtitle burn-in, must be on PATH) · PyInstaller (packaging).
+`edge-tts` · `faster-whisper` · `BLIP` (transformers + torch) · `Google Gemini`
+· `ffmpeg` · `tkinter` · PyInstaller · Inno Setup
 
 `models/`, `build/`, `dist/`, `release/`, `output/`, `work/` are git-ignored.

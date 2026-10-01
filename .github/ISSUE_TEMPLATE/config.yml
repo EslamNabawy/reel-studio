@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or usage help
+    url: https://github.com/EslamNabawy/reel-studio/discussions
+    about: Ask how to use Reel, or get help with a specific workflow.
+  - name: Troubleshooting guide
+    url: https://github.com/EslamNabawy/reel-studio/blob/main/docs/troubleshooting.md
+    about: ffmpeg, models, language, subtitles and build problems are covered here.
